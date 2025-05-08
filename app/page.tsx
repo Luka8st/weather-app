@@ -1,103 +1,140 @@
-import Image from "next/image";
+'use client'
+import { use, useEffect, useState } from "react";
+import DayCard from "./components/DayCard";
+import SearchBar from "./components/SearchBar";
+import CityNotFoundAlert from "./components/CityNotFoundAlert";
+import { DailyForecast, HourlyForecast } from "@/types/weather";
+import { Geolocation } from "@/types/geolocation";
+import { capitalizeString } from "./utils/helper";
+import { Toaster } from "@/components/ui/sonner";
+import { toast } from "sonner";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [dailyForecast, setDailyForecast] = useState<DailyForecast>({
+    dates: [],
+    temp_max: [],
+    temp_min: [],
+    rain: [],
+    wind: []
+  } as DailyForecast);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const [hourlyForecast, setHourlyForecast] = useState<HourlyForecast>({
+    time: [],
+    temp: [],
+    rain: [],
+    wind: []
+  } as HourlyForecast);
+
+  const [cityNotFound, setCityNotFound] = useState(false);
+  const [city, setCity] = useState("Rijeka");
+
+  useEffect(() => {
+    getForecast(city);
+  }, [city]);
+
+  const getForecast = async (city: string) => {
+    const geolocation = await fetchCoordinates(city);
+    if (!geolocation) {
+      return;
+    }
+
+    const forecast = await fetchForecast(geolocation);
+    console.log("forecast", forecast);  
+
+    if (!forecast.daily) {
+      console.error('Daily forecast data is missing');
+      return;
+    }
+
+    setDailyForecast(forecast.daily);
+    setHourlyForecast(forecast.hourly);
+  } 
+
+  async function fetchCoordinates(city: string) {
+    const res = await fetch(`/api/geolocation?city=${encodeURIComponent(city)}`);
+    if (!res.ok) {
+      console.error('City not found');
+      toast.error('City not found', {
+        style: {
+          color: '#ff0000',
+        }
+      });
+      setCityNotFound(true);
+      return null;
+    }
+
+    setCityNotFound(false);
+    return res.json();
+  }
+
+  async function fetchForecast(geolocation: Geolocation) {
+    const res = await fetch(`/api/forecast?latitude=${geolocation.lat}&longitude=${geolocation.lng}`);
+    if (!res.ok) throw new Error('Forecast not found');
+    const data = await res.json();
+    return data;
+  }
+
+  const groupHourlyDataByDay = () => {
+    const groupedData: Record<string, any> = {};
+
+    hourlyForecast.time.forEach((timestamp, index) => {
+      const date = timestamp.split('T')[0]; // Extract the date (e.g., "2025-05-07")
+      if (!groupedData[date]) {
+        groupedData[date] = {
+          time: [],
+          temp: [],
+          rain: [],
+          wind: [],
+        };
+      }
+      groupedData[date].time.push(timestamp);
+      groupedData[date].temp.push(hourlyForecast.temp[index]);
+      groupedData[date].rain.push(hourlyForecast.rain[index]);
+      groupedData[date].wind.push(hourlyForecast.wind[index]);
+    });
+
+    return groupedData;
+  };
+
+  const groupedHourlyData = groupHourlyDataByDay();
+  console.log('groupedHourlyData', groupedHourlyData);
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen p-4">
+      <SearchBar
+        onSearch={async (query) => {
+          const formattedCity = capitalizeString(query); 
+          const geolocation = await fetchCoordinates(query);
+
+          if (geolocation != null) {
+            setCity(formattedCity);
+            await getForecast(formattedCity);
+          }
+        }
+        }
+      />
+      
+      {/*cityNotFound && <CityNotFoundAlert />*/}
+      <Toaster />
+
+      <div className="flex flex-col items-center justify-center mt-4">
+        <h1>Forecast for {city}</h1>
+        <div className="flex flex-col justify-center items-center mt-4">        
+        {dailyForecast.dates.map((date, index) => (
+        <DayCard
+          key={index}
+          daily={{
+            date: dailyForecast.dates[index],
+            temp_max: dailyForecast.temp_max[index],
+            temp_min: dailyForecast.temp_min[index],
+            rain: dailyForecast.rain[index],
+            wind: dailyForecast.wind[index],
+          }}
+          hourly={groupedHourlyData[date]} // Pass grouped hourly data for the day
+        />
+      ))}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
     </div>
   );
 }
