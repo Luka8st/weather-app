@@ -26,6 +26,7 @@ export default function Home() {
   } as HourlyForecast);
 
   const [city, setCity] = useState<City>({ name: 'Rijeka', country: 'Croatia' });
+  const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({})
 
   const updateCity = (newCity: City) => {
     if (city.name !== newCity.name || city.country !== newCity.country) {
@@ -99,6 +100,7 @@ export default function Home() {
         country: country,
       };
       updateCity(formattedCity);
+      setExpandedDays({}) 
       await getForecast(formattedCity);
     }
   }
@@ -129,6 +131,13 @@ export default function Home() {
               index={index}
               daily={dailyForecast}
               hourly={groupedHourlyData[date]}
+              isExpanded={!!expandedDays[date]}
+              onToggle={() =>
+                setExpandedDays(prev => ({
+                  ...prev,
+                  [date]: !prev[date],
+                }))
+              }
             />
           ))}
         </div>

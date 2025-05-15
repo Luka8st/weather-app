@@ -8,18 +8,14 @@ import { Scroll, ThermometerSun, WindIcon, CloudRain, ThermometerSnowflake, Line
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 type DayCardProps = {
-  index: number;
+  index: number
   daily: DailyForecast
-  hourly: Record<string, any>;
+  hourly: Record<string, any>
+  isExpanded: boolean
+  onToggle: () => void
 };
 
-const DayCard = ({ index, daily, hourly }: DayCardProps) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  const handleCheckboxChange = () => {
-    setIsExpanded((prev) => !prev);
-  };
-
+const DayCard = ({ index, daily, hourly, isExpanded, onToggle }: DayCardProps) => {
   return (
     <Card className={`${isExpanded ? 'w-288' : 'w-72'} m-4 transition-all duration-300 ease-in-out border-4 border-gray-600 bg-white shadow-2xl rounded-lg`}>
       <CardHeader className="flex flex-col items-center justify-center">
@@ -75,11 +71,7 @@ const DayCard = ({ index, daily, hourly }: DayCardProps) => {
         </div>
       </CardContent>
       <CardFooter>
-        <Checkbox
-          id="byHour"
-          checked={isExpanded}
-          onClick={handleCheckboxChange}
-        />
+        <Checkbox id={`byHour-${index}`} checked={isExpanded} onClick={onToggle} />
         <label htmlFor="byHour" className="text-sm cursor-pointer px-2">
           Show by hour
         </label>
