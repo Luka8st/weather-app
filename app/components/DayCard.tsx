@@ -1,70 +1,47 @@
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { DailyForecast } from '@/types/weather';
 import React, { useState } from 'react'
-import { formatDateString, getDayOfWeek } from '../utils/helper';
-import { format } from 'date-fns';
+import { extractHour, formatDateString, getDayOfWeek } from '../utils/helper';
 import { Checkbox } from '@/components/ui/checkbox';
 import HourCard from './HourCard';
-import { Scroll } from 'lucide-react';
+import { Scroll, ThermometerSun, WindIcon, CloudRain, ThermometerSnowflake, LineChart } from 'lucide-react';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
-type DailyData = {
-  date: string;
-  temp_max: number;
-  temp_min: number;
-  rain: number;
-  wind: number;
+type DayCardProps = {
+  index: number;
+  daily: DailyForecast
+  hourly: Record<string, any>;
 };
 
-type HourlyData = {
-  time: string[];
-  temp: number[];
-  rain: number[];
-  wind: number[];
-};
-
-type Props = {
-  daily: DailyData;
-  hourly: HourlyData;
-};
-
-const DayCard = ({ daily, hourly }: Props) => {
+const DayCard = ({ index, daily, hourly }: DayCardProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleCheckboxChange = () => {
-    setIsExpanded(!isExpanded);
-  };
-
-  const extractHour = (time: string) => {
-    const date = new Date(time);
-    // return format(date, 'HH:mm');
-    let hours = date.getHours();
-    let normalizedHours = hours % 12 || 12;
-    return hours >= 12 ? `${normalizedHours} PM` : `${normalizedHours} AM`;
+    setIsExpanded((prev) => !prev);
   };
 
   return (
-    <Card className={`${isExpanded ? 'w-288' : 'w-72'} m-4 transition-all duration-300 ease-in-out`}>
+    <Card className={`${isExpanded ? 'w-288' : 'w-72'} m-4 transition-all duration-300 ease-in-out border-4 border-gray-600 bg-white shadow-2xl rounded-lg`}>
       <CardHeader className="flex flex-col items-center justify-center">
         <CardTitle>
-          {getDayOfWeek(daily.date)} ({formatDateString(daily.date)})
+          {getDayOfWeek(daily.dates[index])} ({formatDateString(daily.dates[index])})
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-row">
-        <div className="w-72">
-          Max temp: {daily.temp_max}°C
+      <CardContent className="flex flex-row bg-blue-400/60 rounded-lg p-4">
+        <div className="w-72 py-2">
+          <p className='flex flex-row items-center gap-x-2'><ThermometerSun size={28} /> Max temp: {daily.temp_max[index]}°C</p>
           <br />
-          Min temp: {daily.temp_min}°C
+          <p className='flex flex-row items-center gap-x-2'><ThermometerSnowflake size={28} /> Min temp: {daily.temp_min[index]}°C</p>
           <br />
-          Rain: {daily.rain} mm
+          <p className='flex flex-row items-center gap-x-2'><CloudRain size={28} /> Rain: {daily.rain[index]} mm</p>
           <br />
-          Wind: {daily.wind} km/h
+          <p className='flex flex-row items-center gap-x-2'><WindIcon size={28} /> Wind: {daily.wind[index]} km/h</p>
         </div>
         <div
           className={`transition-all duration-300 ease-in-out h-80 ${
             isExpanded ? 'w-[80%]' : 'w-0'
           } overflow-hidden`}
-        >
+        >      
           {isExpanded && (
             <ScrollArea
               type="always"
@@ -72,7 +49,7 @@ const DayCard = ({ daily, hourly }: Props) => {
               scrollHideDelay={1000}
             >
               <div className="flex flex-row flex-nowrap justify-start">
-                {hourly.time.map((time, i) => (
+                {hourly.time.map((time: string, i: number) => (
                   <div
                     key={i}
                     className="mx-2 opacity-0 translate-y-4 transition-all duration-300 ease-in-out"

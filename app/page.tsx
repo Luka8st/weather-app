@@ -1,13 +1,13 @@
 'use client'
-import { use, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import DayCard from "./components/DayCard";
 import SearchBar from "./components/SearchBar";
-import CityNotFoundAlert from "./components/CityNotFoundAlert";
-import { DailyForecast, HourlyForecast } from "@/types/weather";
+import { DailyForecast, Forecast, HourlyForecast } from "@/types/weather";
 import { Geolocation } from "@/types/geolocation";
-import { capitalizeString } from "./utils/helper";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
+import { City } from "@/types/city";
+import { groupHourlyDataByDay } from "./utils/helper";
 
 export default function Home() {
   const [dailyForecast, setDailyForecast] = useState<DailyForecast>({
@@ -25,114 +25,112 @@ export default function Home() {
     wind: []
   } as HourlyForecast);
 
-  const [cityNotFound, setCityNotFound] = useState(false);
-  const [city, setCity] = useState("Rijeka");
+  const [city, setCity] = useState<City>({ name: 'Rijeka', country: 'Croatia' });
 
-  useEffect(() => {
-    getForecast(city);
-  }, [city]);
-
-  const getForecast = async (city: string) => {
-    const geolocation = await fetchCoordinates(city);
-    if (!geolocation) {
-      return;
+  const updateCity = (newCity: City) => {
+    if (city.name !== newCity.name || city.country !== newCity.country) {
+      setCity(newCity);
     }
+  };
+
+  const getForecast = useCallback(async (city: City) => {
+    const geolocation = await fetchCoordinates(`${city.name},${city.country}`);
+    if (!geolocation) return;
 
     const forecast = await fetchForecast(geolocation);
-    console.log("forecast", forecast);  
-
-    if (!forecast.daily) {
-      console.error('Daily forecast data is missing');
-      return;
+    if (forecast) {
+      setDailyForecast(forecast.daily);
+      setHourlyForecast(forecast.hourly);
     }
+  }, []);
 
-    setDailyForecast(forecast.daily);
-    setHourlyForecast(forecast.hourly);
-  } 
-
-  async function fetchCoordinates(city: string) {
-    const res = await fetch(`/api/geolocation?city=${encodeURIComponent(city)}`);
-    if (!res.ok) {
-      console.error('City not found');
+  async function fetchCoordinates(city: string): Promise<Geolocation | null> {
+    const res = await fetch(`/api/geolocation?city=${encodeURIComponent(city)}`); // TODO create a type for this response
+    if (res.status === 404) {
       toast.error('City not found', {
         style: {
           color: '#ff0000',
         }
       });
-      setCityNotFound(true);
+      return null;
+    }
+    if (res.status !== 200) {
+      toast.error('Something went wrong', {
+        style: {
+          color: '#ff0000',
+        }
+      });
       return null;
     }
 
-    setCityNotFound(false);
     return res.json();
   }
 
-  async function fetchForecast(geolocation: Geolocation) {
+  async function fetchForecast(geolocation: Geolocation): Promise<Forecast | null> {
     const res = await fetch(`/api/forecast?latitude=${geolocation.lat}&longitude=${geolocation.lng}`);
-    if (!res.ok) throw new Error('Forecast not found');
+    if (res.status === 404) {
+      toast.error('Forecast not found', {
+        style: {
+          color: '#ff0000',
+        }
+      });
+      return null;
+    }
+    if (res.status !== 200) {
+      toast.error('Something went wrong', {
+        style: {
+          color: '#ff0000',
+        }
+      });
+      return null;
+    }
     const data = await res.json();
-    return data;
+    return data as Forecast;
   }
 
-  const groupHourlyDataByDay = () => {
-    const groupedData: Record<string, any> = {};
+  const handleSearch = async (query: string) => {
+    const cityName = query.split(',')[0].trim();
+    const country = query.split(',')[1]?.trim();
+    const geolocation = await fetchCoordinates(query);
 
-    hourlyForecast.time.forEach((timestamp, index) => {
-      const date = timestamp.split('T')[0]; // Extract the date (e.g., "2025-05-07")
-      if (!groupedData[date]) {
-        groupedData[date] = {
-          time: [],
-          temp: [],
-          rain: [],
-          wind: [],
-        };
-      }
-      groupedData[date].time.push(timestamp);
-      groupedData[date].temp.push(hourlyForecast.temp[index]);
-      groupedData[date].rain.push(hourlyForecast.rain[index]);
-      groupedData[date].wind.push(hourlyForecast.wind[index]);
-    });
+    if (geolocation != null) {
+      const formattedCity = {
+        name: cityName,
+        country: country,
+      };
+      updateCity(formattedCity);
+      await getForecast(formattedCity);
+    }
+  }
 
-    return groupedData;
-  };
+  const groupedHourlyData = useMemo(() => {
+    return groupHourlyDataByDay(hourlyForecast);
+  }, [hourlyForecast]);
 
-  const groupedHourlyData = groupHourlyDataByDay();
-  console.log('groupedHourlyData', groupedHourlyData);
+
+  useEffect(() => {
+    getForecast(city);
+  }, [city, getForecast]);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4">
+    <div className="flex flex-col items-center justify-center min-h-screen p-4 [background:linear-gradient(to_bottom_right,_#a1c4fd,_#c2e9fb)]">
       <SearchBar
-        onSearch={async (query) => {
-          const formattedCity = capitalizeString(query); 
-          const geolocation = await fetchCoordinates(query);
-
-          if (geolocation != null) {
-            setCity(formattedCity);
-            await getForecast(formattedCity);
-          }
-        }
-        }
+        onSearch={handleSearch}
       />
-      
-      {/*cityNotFound && <CityNotFoundAlert />*/}
+
       <Toaster />
 
       <div className="flex flex-col items-center justify-center mt-4">
-        <h1>Forecast for {city}</h1>
-        <div className="flex flex-col justify-center items-center mt-4">        
-        {dailyForecast.dates.map((date, index) => (
-        <DayCard
-          key={index}
-          daily={{
-            date: dailyForecast.dates[index],
-            temp_max: dailyForecast.temp_max[index],
-            temp_min: dailyForecast.temp_min[index],
-            rain: dailyForecast.rain[index],
-            wind: dailyForecast.wind[index],
-          }}
-          hourly={groupedHourlyData[date]} // Pass grouped hourly data for the day
-        />
-      ))}
+        <h1 className="text-5xl font-extrabold font-serif tracking-tight text-indigo-600 my-8">Forecast for {city.name}, {city.country}</h1>
+        <div className="flex flex-col justify-center items-center mt-4">
+          {dailyForecast.dates.map((date, index) => (
+            <DayCard
+              key={index}
+              index={index}
+              daily={dailyForecast}
+              hourly={groupedHourlyData[date]}
+            />
+          ))}
         </div>
       </div>
     </div>

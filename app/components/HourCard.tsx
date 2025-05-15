@@ -12,8 +12,8 @@ type Props = {
 
 const HourCard = ({ hour, temp, rain, wind }: Props) => {
   return (
-    <Card className="w-60 p-2 flex flex-col items-center justify-center transition-all duration-700 ease-in-out transform hover:scale-105">
-        <CardHeader className="w-36 items-center justify-center">
+    <Card className="w-60 p-2 flex flex-col items-center justify-center transition-all duration-700 ease-in-out transform hover:scale-105 bg-[#f5ea28]">
+        <CardHeader className="w-36 items-center justify-center font-bold">
         	{hour}
         </CardHeader>
         <CardContent>
